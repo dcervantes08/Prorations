@@ -443,7 +443,7 @@ namespace Prorations
         #endregion
 
         #region ProcessFiles
-.        public static bool OpenProrationsFile(string readFileName)
+        public static bool OpenProrationsFile(string readFileName)
         {
             bool fileOpen;
 
