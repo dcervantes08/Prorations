@@ -81,6 +81,30 @@ namespace Prorations
 
                     ExitMessage();
                     break;
+                case "3":
+                    var distToSkip = GetUserDistrictSkipOptions();
+
+                    yearMonth = GetYearMonth();
+                    if (string.IsNullOrEmpty(yearMonth))
+                    {
+                        // User Attempts Exceeded
+                        break;
+                    }
+                    filePath = GetProrationsFilePath();
+                    if (string.IsNullOrEmpty(yearMonth))
+                    {
+                        // User Attempts Exceeded
+                        break;
+                    }
+
+                    PleaseWait();
+
+                    ProcessFilePath(yearMonth, filePath, distToSkip);
+
+                    RunSelectDistrictsYearMonthMerge(filePath, yearMonth, distToSkip);
+
+                    ExitMessage();
+                    break;
                 case "deafult": break;
 
             }
@@ -132,10 +156,11 @@ namespace Prorations
                 Console.WriteLine("* Entry Number | User Option                                                    *");
                 Console.WriteLine("*      1       | Single File Run                                                *");
                 Console.WriteLine("*      2       | Multiple File Run                                              *");
+                Console.WriteLine("*      3       | Multiple File Run & Merge                                      *");
                 Console.WriteLine("*********************************************************************************");
                 userOption = Console.ReadLine();
 
-                if (userOption != "1" && userOption != "2")
+                if (userOption != "1" && userOption != "2" && userOption != "3")
                 {
                     Console.WriteLine("*********************************************************************************");
                     Console.WriteLine("* User Input Error: Please Enter a valid Entry Number                           *");
@@ -607,9 +632,14 @@ namespace Prorations
                         {
                             if ((!prorationRawData.Contains("(CONT)")) && (!prorationRawData.Contains("(CONTINUED)")))
                             {
+                                string status = string.Empty;
+
                                 var operatorName = prorationRawData.Substring(0, 33).Replace(":", "");
                                 var operatorNumber = prorationRawData.Substring(33, 6);
-                                var status = prorationRawData.Substring(40, 10);
+                                if(prorationRawData.Contains("DELQ"))
+                                    status = prorationRawData.Substring(40, 8);
+                                else
+                                    status = prorationRawData.Substring(40, 10);
 
                                 currentOperatorNumber = operatorNumber;
                                 var output = operatorName + "|" + operatorNumber + "|" + status + "|" + yearMonth + "|" + district + ":";
@@ -695,7 +725,7 @@ namespace Prorations
 
                             var depth = "3650";
                             var prodMethod = prorationRawData.Substring(8, 1);
-                            var allBar = "0.0";
+                            var allBar = prorationRawData.Substring(9, 5);
                             var acres = "5";
                             var gor = prorationRawData.Substring(31, 5);
                             var un2 = "";
@@ -740,6 +770,72 @@ namespace Prorations
             leases.Close();
             wells.Close();
         }
+        public static void RunSelectDistrictsYearMonthMerge(string filePath, string yearMonth, List<string> districtsToSkip)
+        {
+            var filesToCreate = new List<string> { "Operators", "Leases", "Wells" };
+            var districtsToRun = GetDistricts();
+            string inputFileName = string.Empty;
+
+            foreach (var dist in districtsToSkip)
+            {
+                foreach (var district in districtsToRun)
+                {
+                    if (district.District == dist)
+                        district.Run = "N";
+                }
+            }
+
+            foreach (var file in filesToCreate)
+            {
+                var outputFileName = filePath + "\\" + file + "_" + yearMonth + ".txt";
+                Stream outFile = File.Create(outputFileName);
+
+                foreach (var district in districtsToRun)
+                {
+                    if (district.Run == "Y")
+                    {
+                        try
+                        {
+                            switch (file)
+                            {
+                                case "Operators":
+                                    inputFileName = filePath + "\\" + "OP_" + district.District + "_" + yearMonth + ".txt";
+                                    if (OpenProrationsFile(inputFileName))
+                                    {
+                                        var read = File.OpenRead(inputFileName);
+
+                                        read.CopyTo(outFile);
+                                    }
+                                    break;
+                                case "Leases":
+                                    inputFileName = filePath + "\\" + "L_" + district.District + "_" + yearMonth + ".txt";
+                                    if (OpenProrationsFile(inputFileName))
+                                    {
+                                        var read = File.OpenRead(inputFileName);
+
+                                        read.CopyTo(outFile);
+                                    }
+                                    break;
+                                case "Wells":
+                                    inputFileName = filePath + "\\" + "W_" + district.District + "_" + yearMonth + ".txt";
+                                    if (OpenProrationsFile(inputFileName))
+                                    {
+                                        var read = File.OpenRead(inputFileName);
+
+                                        read.CopyTo(outFile);
+                                    }
+                                    break;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Skip the File for now. Add Logging later 
+                        }
+                    }
+                }
+            }
+        }
+
         #endregion
     }
  }
